@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Startup Funding Analyser</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root { color-scheme:dark; --bg:#090b12; --panel:#121722; --line:#293140; --text:#f7f8fb; --muted:#96a0b2; --lime:#c8ff65; --violet:#a78bfa; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,ui-sans-serif,system-ui,sans-serif; background:radial-gradient(circle at 85% 0,#282044 0,transparent 32%),var(--bg); color:var(--text); }
+    header,main { width:min(1440px,92vw); margin:auto; }
+    header { padding:48px 0 26px; }
+    .tag { display:inline-block; border:1px solid #526136; color:var(--lime); padding:6px 9px; border-radius:99px; font-size:11px; font-weight:800; letter-spacing:.12em; }
+    h1 { margin:14px 0 8px; font-size:clamp(34px,6vw,68px); letter-spacing:-.055em; line-height:.96; }
+    header p { color:var(--muted); max-width:680px; }
+    .toolbar,.kpis,.charts { display:grid; gap:14px; }
+    .toolbar { grid-template-columns:1fr 1fr; }
+    .kpis { grid-template-columns:repeat(4,1fr); margin:14px 0; }
+    .charts { grid-template-columns:1.1fr .9fr; }
+    .panel,.kpi { background:rgba(18,23,34,.94); border:1px solid var(--line); border-radius:16px; padding:18px; }
+    .kpi span,label { display:block; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:7px; }
+    .kpi strong { font-size:clamp(22px,3vw,34px); }
+    select,input { width:100%; background:#0b0f17; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:12px; font:inherit; }
+    h2 { margin:0 0 10px; font-size:17px; }
+    #trend,#top,#sectors { min-height:390px; }
+    .table-wrap { max-height:400px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { text-align:left; border-bottom:1px solid var(--line); padding:10px; white-space:nowrap; }
+    th { color:var(--lime); position:sticky; top:0; background:var(--panel); }
+    footer { text-align:center; color:var(--muted); padding:30px; font-size:13px; }
+    @media(max-width:850px){.kpis,.charts{grid-template-columns:1fr 1fr}.charts .panel:first-child{grid-column:1/-1}}
+    @media(max-width:580px){.toolbar,.kpis,.charts{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header><span class="tag">INDIA STARTUP ECOSYSTEM</span><h1>Startup Funding<br>Analyser</h1><p>Explore investment volume, funding trends, leading startups and investor activity from the project dataset.</p></header>
+  <main>
+    <section class="toolbar panel">
+      <div><label for="year">Funding year</label><select id="year"><option value="all">All years</option></select></div>
+      <div><label for="investor">Investor analysis</label><select id="investor"><option value="all">All investors</option></select></div>
+    </section>
+    <section class="kpis">
+      <div class="kpi"><span>Total funding</span><strong id="total">—</strong></div>
+      <div class="kpi"><span>Largest deal</span><strong id="largest">—</strong></div>
+      <div class="kpi"><span>Funded startups</span><strong id="startups">—</strong></div>
+      <div class="kpi"><span>Average deal</span><strong id="average">—</strong></div>
+    </section>
+    <section class="charts">
+      <div class="panel"><h2>Funding over time</h2><div id="trend"></div></div>
+      <div class="panel"><h2>Top funded startups</h2><div id="top"></div></div>
+      <div class="panel"><h2>Funding by sector</h2><div id="sectors"></div></div>
+      <div class="panel"><h2>Recent investments</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Startup</th><th>City</th><th>Round</th><th>Amount</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+    </section>
+  </main>
+  <footer>Built by Divyansh Singh · Interactive analysis powered by the repository dataset</footer>
+  <script>
+    const money=n=>`${new Intl.NumberFormat('en-IN',{maximumFractionDigits:1}).format(n)} Cr`;
+    const base={paper_bgcolor:'transparent',plot_bgcolor:'transparent',font:{color:'#e8ebf1'},margin:{l:42,r:18,t:18,b:50}};
+    let data=[];
+    Papa.parse('startup_cleaned.csv',{download:true,header:true,dynamicTyping:true,skipEmptyLines:true,complete:({data:rows})=>{
+      data=rows.map(r=>({...r,dateObj:new Date(r.date),amount:Number(r.amount)||0})).filter(r=>r.startup&&r.dateObj.toString()!=='Invalid Date');
+      [...new Set(data.map(r=>r.dateObj.getFullYear()))].sort((a,b)=>b-a).forEach(y=>document.querySelector('#year').add(new Option(y,y)));
+      const investors=[...new Set(data.flatMap(r=>String(r.investors||'').split(',')).map(x=>x.trim()).filter(Boolean))].sort();
+      investors.forEach(x=>document.querySelector('#investor').add(new Option(x,x)));
+      render();
+    },error:()=>document.querySelector('main').innerHTML='<div class="panel">The funding dataset could not be loaded.</div>'});
+    function group(rows,key){return rows.reduce((a,r)=>{const k=key(r);a[k]=(a[k]||0)+r.amount;return a;},{});}
+    function current(){const y=document.querySelector('#year').value,i=document.querySelector('#investor').value;return data.filter(r=>(y==='all'||r.dateObj.getFullYear()==y)&&(i==='all'||String(r.investors||'').split(',').map(x=>x.trim()).includes(i)));}
+    function render(){
+      const rows=current(),total=rows.reduce((a,r)=>a+r.amount,0);
+      document.querySelector('#total').textContent=money(total);
+      document.querySelector('#largest').textContent=money(Math.max(0,...rows.map(r=>r.amount)));
+      document.querySelector('#startups').textContent=new Set(rows.map(r=>r.startup)).size.toLocaleString('en-IN');
+      document.querySelector('#average').textContent=money(rows.length?total/rows.length:0);
+      const monthly=group(rows,r=>`${r.dateObj.getFullYear()}-${String(r.dateObj.getMonth()+1).padStart(2,'0')}`),mx=Object.keys(monthly).sort();
+      Plotly.react('trend',[{type:'scatter',mode:'lines+markers',x:mx,y:mx.map(k=>monthly[k]),line:{color:'#c8ff65',width:3},marker:{size:5},fill:'tozeroy',fillcolor:'rgba(200,255,101,.08)'}],{...base,xaxis:{gridcolor:'#293140'},yaxis:{gridcolor:'#293140',title:'Crore'}},{responsive:true,displaylogo:false});
+      const startups=Object.entries(group(rows,r=>r.startup)).sort((a,b)=>b[1]-a[1]).slice(0,10).reverse();
+      Plotly.react('top',[{type:'bar',orientation:'h',x:startups.map(x=>x[1]),y:startups.map(x=>x[0]),marker:{color:'#a78bfa'}}],{...base,margin:{l:105,r:15,t:18,b:45},xaxis:{gridcolor:'#293140'}},{responsive:true,displaylogo:false});
+      const sectors=Object.entries(group(rows,r=>r.vertical||'Other')).sort((a,b)=>b[1]-a[1]).slice(0,8);
+      Plotly.react('sectors',[{type:'pie',labels:sectors.map(x=>x[0]),values:sectors.map(x=>x[1]),hole:.55,marker:{colors:['#c8ff65','#a78bfa','#57d5ff','#ff9767','#ffdd66','#74e0b5','#f58ad3','#8294b5']}}],{...base,showlegend:true,legend:{orientation:'h',y:-.15}},{responsive:true,displaylogo:false});
+      document.querySelector('#rows').innerHTML=[...rows].sort((a,b)=>b.dateObj-a.dateObj).slice(0,50).map(r=>`<tr><td>${r.date}</td><td>${r.startup}</td><td>${r.city||'—'}</td><td>${r.round||'—'}</td><td>${money(r.amount)}</td></tr>`).join('')||'<tr><td colspan="5">No investments match.</td></tr>';
+    }
+    document.querySelector('#year').addEventListener('change',render);
+    document.querySelector('#investor').addEventListener('change',render);
+  </script>
+</body>
+</html>
