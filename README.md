@@ -2,6 +2,10 @@
 
 An interactive Streamlit dashboard for exploring startup funding data, funding trends, and investor activity.
 
+**Live dashboard:** [startup-funding-analyser.vercel.app](https://startup-funding-analyser.vercel.app/)
+
+The repository includes both the original Streamlit analysis and a responsive browser version used for the Vercel production deployment.
+
 ## Features
 
 ### Overall analysis
@@ -43,8 +47,10 @@ streamlit run app.py
 ```text
 app.py                 Main startup-funding dashboard
 devik.py               Streamlit experimentation file
+index.html              Vercel-ready interactive dashboard
 startup_cleaned.csv    Cleaned dataset used by the dashboard
 startup_funding.csv    Original funding dataset
+vercel.json             Production hosting configuration
 ```
 
 ---
