@@ -6,6 +6,12 @@ An interactive Streamlit dashboard for exploring startup funding data, funding t
 
 The repository includes both the original Streamlit analysis and a responsive browser version used for the Vercel production deployment.
 
+## Data freshness
+
+The original dataset covered 2015–2020. It now includes a curated, source-backed set of major Indian startup funding rounds from 2024–2026 so the live analyser includes current companies and investors such as Pixxel, Sarvam AI, Rapido, Scapia, Juspay, Porter, Darwinbox, Infra.Market, PhysicsWallah and Zepto.
+
+Recent rows include source metadata in the CSV. See `DATA_SOURCES_2026.md` for methodology and provenance.
+
 ## Features
 
 ### Overall analysis
