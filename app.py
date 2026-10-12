@@ -59,7 +59,7 @@ def load_investor_details(investor):
     st.title(investor)
     # load the recent 5 investments of the investor
     investor_rows = df[df['investors'].fillna('').str.split(',').apply(
-        lambda names: investor in [name.strip() for name in names]
+        lambda names: investor.casefold() in [name.strip().casefold() for name in names]
     )].copy()
     if investor_rows.empty:
         st.info('No investments found for this investor.')
@@ -110,7 +110,20 @@ elif option == 'StartUp':
     st.metric('Funding records', len(startup_rows))
     st.dataframe(startup_rows[['date', 'vertical', 'city', 'investors', 'round', 'amount', 'source_url']], use_container_width=True)
 else:
-    selected_investor = st.sidebar.selectbox('Select Investor', sorted({name.strip() for value in df['investors'].dropna() for name in value.split(',') if name.strip()}))
+    # A row reports the entire round, not each participating investor's check size.
+    investor_totals = {}
+    investor_names = {}
+    for names, amount in zip(df['investors'].fillna(''), df['amount']):
+        for name in {part.strip() for part in names.split(',') if part.strip()}:
+            key = name.casefold()
+            investor_names.setdefault(key, name)
+            investor_totals[key] = investor_totals.get(key, 0) + amount
+    ranked_investors = sorted(investor_totals, key=lambda key: (-investor_totals[key], investor_names[key].casefold()))
+    selected_key = st.sidebar.selectbox(
+        'Select Investor (highest associated funding first)', ranked_investors,
+        format_func=lambda key: f'{investor_names[key]} — {investor_totals[key]:,.1f} Cr',
+    )
+    st.sidebar.caption('Totals include the full value of each participating round; individual investor contributions are not available.')
     btn2 = st.sidebar.button('Find Investor Details')
     if btn2:
-        load_investor_details(selected_investor)
+        load_investor_details(investor_names[selected_key])
