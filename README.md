@@ -62,3 +62,4 @@ vercel.json             Production hosting configuration
 ---
 
 Built by [Divyansh Singh](https://github.com/divbytes-prog).
+\n## Interpretation and limitations\n\nThe historical dataset covers 2015–2020. Only 15 curated source-linked rows\nwere added for 2024–2026; 2021–2023 are missing, not zero-funding years.\nThe newer rows preserve source URLs, reported amounts/currencies, and any\napproximate INR-crore conversion. Most historical rows do not have that source\nmetadata. The live website includes year, investor, and startup searches,\nclear empty states, and source links for the recent rows. The original\nStreamlit app now displays startup details and matches investor names by\ncomma-separated entry rather than a substring. The displayed funding\nanalysis describes this dataset and is not a complete market estimate.\n
