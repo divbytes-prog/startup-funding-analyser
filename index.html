@@ -41,10 +41,10 @@
   <main>
     <section class="toolbar panel">
       <div><label for="year">Funding year</label><select id="year"><option value="all">All years</option></select></div>
-      <div><label for="investor">Investors by associated funding</label><input id="investor-search" aria-label="Search investor names" placeholder="Search investors…" /><select id="investor" aria-label="Select investor, highest associated funding first" style="margin-top:8px"><option value="">All investors</option></select></div>
+      <div><label for="investor">Investor search</label><input id="investor" list="investor-options" placeholder="All investors — type a name" /><datalist id="investor-options"></datalist></div>
       <div><label for="startup">Startup search</label><input id="startup" placeholder="All startups — type a name" /></div>
     </section>
-    <p class="note">Coverage: historical records from 2015–2020 and a curated selection of source-linked rounds from 2024–2026. The dataset does not cover 2021–2023; missing years do not mean zero funding. Recent USD conversions to INR crore are approximate. Investor ordering uses the full value of rounds they participated in; individual contributions are not available and a round with multiple investors counts for each.</p>
+    <p class="note">Coverage: historical records from 2015–2020 and selected source-linked rounds from 2021–2026. This curated dataset is not a complete record of Indian startup funding. USD conversions to INR crore are approximate.</p>
     <section class="kpis">
       <div class="kpi"><span>Total funding</span><strong id="total">—</strong></div>
       <div class="kpi"><span>Largest deal</span><strong id="largest">—</strong></div>
@@ -63,56 +63,21 @@
     const money=n=>`${new Intl.NumberFormat('en-IN',{maximumFractionDigits:1}).format(n)} Cr`;
     const base={paper_bgcolor:'transparent',plot_bgcolor:'transparent',font:{color:'#e8ebf1'},margin:{l:42,r:18,t:18,b:50}};
     let data=[];
-    let rankedInvestors=[];
     const chartReady={};
     Papa.parse('startup_cleaned.csv',{download:true,header:true,dynamicTyping:true,skipEmptyLines:true,complete:({data:rows})=>{
       data=rows.map(r=>({...r,dateObj:new Date(r.date),amount:Number(r.amount)||0})).filter(r=>r.startup&&r.dateObj.toString()!=='Invalid Date');
       [...new Set(data.map(r=>r.dateObj.getFullYear()))].sort((a,b)=>b-a).forEach(y=>document.querySelector('#year').add(new Option(y,y)));
-      const totals=new Map();
-      data.forEach(r=>{
-        const names=new Map();
-        String(r.investors||'').split(',').map(x=>x.trim()).filter(Boolean).forEach(name=>names.set(name.toLocaleLowerCase('en'),name));
-        names.forEach((name,key)=>{
-          const prior=totals.get(key)||{name,amount:0};
-          prior.amount+=r.amount;
-          totals.set(key,prior);
-        });
-      });
-      rankedInvestors=[...totals.entries()].map(([key,record])=>({key,...record})).sort((a,b)=>b.amount-a.amount||a.name.localeCompare(b.name));
-      updateInvestorOptions();
+      const investors=[...new Set(data.flatMap(r=>String(r.investors||'').split(',')).map(x=>x.trim()).filter(Boolean))].sort();
+      investors.forEach(x=>document.querySelector('#investor-options').append(new Option(x,x)));
+      render();
     },error:()=>document.querySelector('main').innerHTML='<div class="panel">The funding dataset could not be loaded.</div>'});
     function group(rows,key){return rows.reduce((a,r)=>{const k=key(r);a[k]=(a[k]||0)+r.amount;return a;},{});}
-    function sectorName(value){
-      const name=String(value||'Other').trim()||'Other';
-      const key=name.toLocaleLowerCase('en').replace(/[\s-]/g,'');
-      if(key==='ecommerce'||key==='ecommerce&mcommerceplatform')return 'E-Commerce';
-      if(key==='fintech')return 'FinTech';
-      return name;
-    }
-    function startupName(value){
-      const name=String(value||'').trim();
-      if(name.toLocaleLowerCase('en')==='flipkart.com')return 'Flipkart';
-      if(['ola cabs','olacabs'].includes(name.toLocaleLowerCase('en')))return 'Ola';
-      return name;
-    }
-    function updateInvestorOptions(){
-      const select=document.querySelector('#investor');
-      const previous=select.value;
-      const query=document.querySelector('#investor-search').value.trim().toLocaleLowerCase('en');
-      const options=document.createDocumentFragment();
-      options.append(new Option('All investors',''));
-      rankedInvestors.filter(r=>r.key.includes(query)).forEach(r=>options.append(new Option(`${r.name} — ${money(r.amount)}`,r.key)));
-      select.replaceChildren(options);
-      select.value=previous;
-      if(select.selectedIndex<0)select.value='';
-      render();
-    }
     function current(){
       const y=document.querySelector('#year').value;
-      const i=document.querySelector('#investor').value;
+      const i=document.querySelector('#investor').value.trim().toLowerCase();
       const s=document.querySelector('#startup').value.trim().toLowerCase();
       return data.filter(r=>(y==='all'||r.dateObj.getFullYear()==y)
-        &&(!i||String(r.investors||'').split(',').some(name=>name.trim().toLocaleLowerCase('en')===i))
+        &&(!i||String(r.investors||'').split(',').some(name=>name.trim().toLowerCase().includes(i)))
         &&(!s||String(r.startup).toLowerCase().includes(s)));
     }
     function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -128,28 +93,18 @@
       const rows=current(),total=rows.reduce((a,r)=>a+r.amount,0);
       document.querySelector('#total').textContent=money(total);
       document.querySelector('#largest').textContent=money(Math.max(0,...rows.map(r=>r.amount)));
-      document.querySelector('#startups').textContent=new Set(rows.map(r=>startupName(r.startup))).size.toLocaleString('en-IN');
+      document.querySelector('#startups').textContent=new Set(rows.map(r=>r.startup)).size.toLocaleString('en-IN');
       document.querySelector('#average').textContent=money(rows.length?total/rows.length:0);
       const monthly=group(rows,r=>`${r.dateObj.getFullYear()}-${String(r.dateObj.getMonth()+1).padStart(2,'0')}`),mx=Object.keys(monthly).sort();
-      const dates=[],values=[];
-      mx.forEach((month,index)=>{
-        const date=`${month}-01`;
-        if(index&&Date.parse(date)-Date.parse(`${mx[index-1]}-01`)>150*86400000){
-          dates.push(new Date((Date.parse(date)+Date.parse(`${mx[index-1]}-01`))/2).toISOString().slice(0,10));
-          values.push(null);
-        }
-        dates.push(date);values.push(monthly[month]);
-      });
-      chart('trend',[{type:'scatter',mode:'lines+markers',x:dates,y:values,connectgaps:false,line:{color:'#c8ff65',width:3},marker:{size:5},hovertemplate:'%{x|%b %Y}<br>₹%{y:,.1f} Cr<extra></extra>'}],{...base,xaxis:{gridcolor:'#293140',type:'date',tickformat:'%Y',nticks:7},yaxis:{gridcolor:'#293140',title:'INR crore'}},rows.length);
-      const startups=Object.entries(group(rows,r=>startupName(r.startup))).sort((a,b)=>b[1]-a[1]).slice(0,10).reverse();
+      chart('trend',[{type:'scatter',mode:'lines+markers',x:mx,y:mx.map(k=>monthly[k]),line:{color:'#c8ff65',width:3},marker:{size:5},fill:'tozeroy',fillcolor:'rgba(200,255,101,.08)'}],{...base,xaxis:{gridcolor:'#293140',type:'category'},yaxis:{gridcolor:'#293140',title:'INR crore'}},rows.length);
+      const startups=Object.entries(group(rows,r=>r.startup)).sort((a,b)=>b[1]-a[1]).slice(0,10).reverse();
       chart('top',[{type:'bar',orientation:'h',x:startups.map(x=>x[1]),y:startups.map(x=>x[0]),marker:{color:'#a78bfa'}}],{...base,margin:{l:105,r:15,t:18,b:45},xaxis:{gridcolor:'#293140'}},rows.length);
-      const sectors=Object.entries(group(rows,r=>sectorName(r.vertical))).sort((a,b)=>b[1]-a[1]).slice(0,8);
-      chart('sectors',[{type:'pie',labels:sectors.map(x=>x[0]),values:sectors.map(x=>x[1]),hole:.55,textinfo:'none',hovertemplate:'%{label}<br>₹%{value:,.1f} Cr · %{percent}<extra></extra>',marker:{colors:['#c8ff65','#a78bfa','#57d5ff','#ff9767','#ffdd66','#74e0b5','#f58ad3','#8294b5']}}],{...base,showlegend:true,legend:{orientation:'h',y:-.15}},rows.length&&sectors.some(x=>x[1]>0));
+      const sectors=Object.entries(group(rows,r=>r.vertical||'Other')).sort((a,b)=>b[1]-a[1]).slice(0,8);
+      chart('sectors',[{type:'pie',labels:sectors.map(x=>x[0]),values:sectors.map(x=>x[1]),hole:.55,marker:{colors:['#c8ff65','#a78bfa','#57d5ff','#ff9767','#ffdd66','#74e0b5','#f58ad3','#8294b5']}}],{...base,showlegend:true,legend:{orientation:'h',y:-.15}},rows.length&&sectors.some(x=>x[1]>0));
       document.querySelector('#rows').innerHTML=[...rows].sort((a,b)=>b.dateObj-a.dateObj).slice(0,50).map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.startup)}</td><td>${escapeHtml(r.city||'—')}</td><td>${escapeHtml(r.round||'—')}</td><td>${money(r.amount)}</td><td>${sourceLink(r.source_url)}</td></tr>`).join('')||'<tr><td colspan="6">No investments match.</td></tr>';
     }
     document.querySelector('#year').addEventListener('change',render);
-    document.querySelector('#investor').addEventListener('change',render);
-    document.querySelector('#investor-search').addEventListener('input',updateInvestorOptions);
+    document.querySelector('#investor').addEventListener('input',render);
     document.querySelector('#startup').addEventListener('input',render);
   </script>
 </body>
