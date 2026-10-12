@@ -6,12 +6,6 @@ An interactive Streamlit dashboard for exploring startup funding data, funding t
 
 The repository includes both the original Streamlit analysis and a responsive browser version used for the Vercel production deployment.
 
-## Data freshness
-
-The original dataset covered 2015–2020. It now includes a curated, source-backed set of major Indian startup funding rounds from 2024–2026 so the live analyser includes current companies and investors such as Pixxel, Sarvam AI, Rapido, Scapia, Juspay, Porter, Darwinbox, Infra.Market, PhysicsWallah and Zepto.
-
-Recent rows include source metadata in the CSV. See `DATA_SOURCES_2026.md` for methodology and provenance.
-
 ## Features
 
 ### Overall analysis
@@ -25,10 +19,13 @@ Recent rows include source metadata in the CSV. See `DATA_SOURCES_2026.md` for m
 
 ### Investor analysis
 
+- Investor filter ordered by the combined value of funding rounds in which each investor appears
 - Recent investments
 - Biggest investments
 - Sector-wise investment distribution
 - Year-over-year investment activity
+
+The dataset lists round totals and participant names, but does not disclose how much each investor contributed. The investor ordering therefore sums the **full round value** for every named participant; it is a measure of associated funding, not an estimate of an investor's own check sizes. Name variants beyond letter case may remain separate. A misrecorded Rapido Series B outlier was corrected to approximately ₹391 crore, with a source URL preserved in `startup_cleaned.csv`.
 
 The repository also includes `devik.py`, which was used as a Streamlit experimentation file while learning widgets, layouts, forms, uploads, progress indicators, and media components.
 
@@ -62,4 +59,3 @@ vercel.json             Production hosting configuration
 ---
 
 Built by [Divyansh Singh](https://github.com/divbytes-prog).
-\n## Interpretation and limitations\n\nThe historical dataset covers 2015–2020. Only 15 curated source-linked rows\nwere added for 2024–2026; 2021–2023 are missing, not zero-funding years.\nThe newer rows preserve source URLs, reported amounts/currencies, and any\napproximate INR-crore conversion. Most historical rows do not have that source\nmetadata. The live website includes year, investor, and startup searches,\nclear empty states, and source links for the recent rows. The original\nStreamlit app now displays startup details and matches investor names by\ncomma-separated entry rather than a substring. The displayed funding\nanalysis describes this dataset and is not a complete market estimate.\n
