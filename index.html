@@ -85,14 +85,14 @@
     function sectorName(value){
       const name=String(value||'Other').trim()||'Other';
       const key=name.toLocaleLowerCase('en').replace(/[\s-]/g,'');
-      if(key==='ecommerce')return 'E-Commerce';
+      if(key==='ecommerce'||key==='ecommerce&mcommerceplatform')return 'E-Commerce';
       if(key==='fintech')return 'FinTech';
       return name;
     }
     function startupName(value){
       const name=String(value||'').trim();
       if(name.toLocaleLowerCase('en')==='flipkart.com')return 'Flipkart';
-      if(name.toLocaleLowerCase('en')==='ola cabs')return 'Ola';
+      if(['ola cabs','olacabs'].includes(name.toLocaleLowerCase('en')))return 'Ola';
       return name;
     }
     function updateInvestorOptions(){
@@ -144,7 +144,7 @@
       const startups=Object.entries(group(rows,r=>startupName(r.startup))).sort((a,b)=>b[1]-a[1]).slice(0,10).reverse();
       chart('top',[{type:'bar',orientation:'h',x:startups.map(x=>x[1]),y:startups.map(x=>x[0]),marker:{color:'#a78bfa'}}],{...base,margin:{l:105,r:15,t:18,b:45},xaxis:{gridcolor:'#293140'}},rows.length);
       const sectors=Object.entries(group(rows,r=>sectorName(r.vertical))).sort((a,b)=>b[1]-a[1]).slice(0,8);
-      chart('sectors',[{type:'pie',labels:sectors.map(x=>x[0]),values:sectors.map(x=>x[1]),hole:.55,marker:{colors:['#c8ff65','#a78bfa','#57d5ff','#ff9767','#ffdd66','#74e0b5','#f58ad3','#8294b5']}}],{...base,showlegend:true,legend:{orientation:'h',y:-.15}},rows.length&&sectors.some(x=>x[1]>0));
+      chart('sectors',[{type:'pie',labels:sectors.map(x=>x[0]),values:sectors.map(x=>x[1]),hole:.55,textinfo:'none',hovertemplate:'%{label}<br>₹%{value:,.1f} Cr · %{percent}<extra></extra>',marker:{colors:['#c8ff65','#a78bfa','#57d5ff','#ff9767','#ffdd66','#74e0b5','#f58ad3','#8294b5']}}],{...base,showlegend:true,legend:{orientation:'h',y:-.15}},rows.length&&sectors.some(x=>x[1]>0));
       document.querySelector('#rows').innerHTML=[...rows].sort((a,b)=>b.dateObj-a.dateObj).slice(0,50).map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.startup)}</td><td>${escapeHtml(r.city||'—')}</td><td>${escapeHtml(r.round||'—')}</td><td>${money(r.amount)}</td><td>${sourceLink(r.source_url)}</td></tr>`).join('')||'<tr><td colspan="6">No investments match.</td></tr>';
     }
     document.querySelector('#year').addEventListener('change',render);
