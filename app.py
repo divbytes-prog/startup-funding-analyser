@@ -79,13 +79,19 @@ def load_investor_details(investor):
         st.pyplot(fig)
 
     with col2:
-        verical_series = investor_rows.groupby('vertical')['amount'].sum()
+        sector = investor_rows['vertical'].fillna('Other').str.strip()
+        normalized = sector.str.casefold().str.replace(r'[\s-]', '', regex=True)
+        sector = sector.mask(normalized.isin(['ecommerce', 'ecommerce&mcommerceplatform']), 'E-Commerce')
+        sector = sector.mask(normalized == 'fintech', 'FinTech')
+        verical_series = investor_rows.assign(sector=sector).groupby('sector')['amount'].sum()
 
         st.subheader('Sectors invested in')
-        fig1, ax1 = plt.subplots()
-        ax1.pie(verical_series,labels=verical_series.index,autopct="%0.01f%%")
-
-        st.pyplot(fig1)
+        if verical_series.sum() > 0:
+            fig1, ax1 = plt.subplots()
+            ax1.pie(verical_series, labels=verical_series.index, autopct='%1.1f%%')
+            st.pyplot(fig1)
+        else:
+            st.info('This investor has no disclosed funding amounts in the dataset.')
 
     year_series = investor_rows.groupby('year')['amount'].sum().sort_index()
 
