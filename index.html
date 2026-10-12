@@ -63,6 +63,7 @@
     const money=n=>`${new Intl.NumberFormat('en-IN',{maximumFractionDigits:1}).format(n)} Cr`;
     const base={paper_bgcolor:'transparent',plot_bgcolor:'transparent',font:{color:'#e8ebf1'},margin:{l:42,r:18,t:18,b:50}};
     let data=[];
+    const chartReady={};
     Papa.parse('startup_cleaned.csv',{download:true,header:true,dynamicTyping:true,skipEmptyLines:true,complete:({data:rows})=>{
       data=rows.map(r=>({...r,dateObj:new Date(r.date),amount:Number(r.amount)||0})).filter(r=>r.startup&&r.dateObj.toString()!=='Invalid Date');
       [...new Set(data.map(r=>r.dateObj.getFullYear()))].sort((a,b)=>b-a).forEach(y=>document.querySelector('#year').add(new Option(y,y)));
@@ -82,9 +83,11 @@
     function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
     function sourceLink(raw){try{const u=new URL(raw);return u.protocol==='https:'?`<a href="${escapeHtml(u.href)}" target="_blank" rel="noopener noreferrer">View</a>`:'—';}catch{return '—';}}
     function chart(id,traces,layout,hasRows){
-      if(!hasRows){Plotly.purge(id);document.getElementById(id).textContent='No funding records match these filters.';return;}
-      document.getElementById(id).textContent='';
-      Plotly.react(id,traces,layout,{responsive:true,displaylogo:false});
+      if(!hasRows){Plotly.purge(id);chartReady[id]=false;document.getElementById(id).textContent='No funding records match these filters.';return;}
+      if(!chartReady[id])document.getElementById(id).textContent='';
+      const draw=chartReady[id]?Plotly.react:Plotly.newPlot;
+      draw(id,traces,layout,{responsive:true,displaylogo:false});
+      chartReady[id]=true;
     }
     function render(){
       const rows=current(),total=rows.reduce((a,r)=>a+r.amount,0);
