@@ -37,7 +37,7 @@ def load_overall_analysis():
     with col4:
         st.metric('Funded Startups',num_startups)
 
-    st.caption('Historical coverage: 2015–2020; curated recent deals: 2024–2026. The dataset does not cover 2021–2023.')
+    st.caption('Historical coverage: 2015–2020; selected source-linked deals: 2021–2026. This dataset is not a complete record of Indian startup funding.')
     st.header('Monthly funding trend')
     selected_option = st.selectbox('Select Type',['Total','Count'])
     if selected_option == 'Total':
@@ -59,7 +59,7 @@ def load_investor_details(investor):
     st.title(investor)
     # load the recent 5 investments of the investor
     investor_rows = df[df['investors'].fillna('').str.split(',').apply(
-        lambda names: investor.casefold() in [name.strip().casefold() for name in names]
+        lambda names: investor in [name.strip() for name in names]
     )].copy()
     if investor_rows.empty:
         st.info('No investments found for this investor.')
@@ -79,19 +79,13 @@ def load_investor_details(investor):
         st.pyplot(fig)
 
     with col2:
-        sector = investor_rows['vertical'].fillna('Other').str.strip()
-        normalized = sector.str.casefold().str.replace(r'[\s-]', '', regex=True)
-        sector = sector.mask(normalized.isin(['ecommerce', 'ecommerce&mcommerceplatform']), 'E-Commerce')
-        sector = sector.mask(normalized == 'fintech', 'FinTech')
-        verical_series = investor_rows.assign(sector=sector).groupby('sector')['amount'].sum()
+        verical_series = investor_rows.groupby('vertical')['amount'].sum()
 
         st.subheader('Sectors invested in')
-        if verical_series.sum() > 0:
-            fig1, ax1 = plt.subplots()
-            ax1.pie(verical_series, labels=verical_series.index, autopct='%1.1f%%')
-            st.pyplot(fig1)
-        else:
-            st.info('This investor has no disclosed funding amounts in the dataset.')
+        fig1, ax1 = plt.subplots()
+        ax1.pie(verical_series,labels=verical_series.index,autopct="%0.01f%%")
+
+        st.pyplot(fig1)
 
     year_series = investor_rows.groupby('year')['amount'].sum().sort_index()
 
@@ -116,20 +110,7 @@ elif option == 'StartUp':
     st.metric('Funding records', len(startup_rows))
     st.dataframe(startup_rows[['date', 'vertical', 'city', 'investors', 'round', 'amount', 'source_url']], use_container_width=True)
 else:
-    # A row reports the entire round, not each participating investor's check size.
-    investor_totals = {}
-    investor_names = {}
-    for names, amount in zip(df['investors'].fillna(''), df['amount']):
-        for name in {part.strip() for part in names.split(',') if part.strip()}:
-            key = name.casefold()
-            investor_names.setdefault(key, name)
-            investor_totals[key] = investor_totals.get(key, 0) + amount
-    ranked_investors = sorted(investor_totals, key=lambda key: (-investor_totals[key], investor_names[key].casefold()))
-    selected_key = st.sidebar.selectbox(
-        'Select Investor (highest associated funding first)', ranked_investors,
-        format_func=lambda key: f'{investor_names[key]} — {investor_totals[key]:,.1f} Cr',
-    )
-    st.sidebar.caption('Totals include the full value of each participating round; individual investor contributions are not available.')
+    selected_investor = st.sidebar.selectbox('Select Investor', sorted({name.strip() for value in df['investors'].dropna() for name in value.split(',') if name.strip()}))
     btn2 = st.sidebar.button('Find Investor Details')
     if btn2:
-        load_investor_details(investor_names[selected_key])
+        load_investor_details(selected_investor)
