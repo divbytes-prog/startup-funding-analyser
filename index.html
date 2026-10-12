@@ -41,10 +41,10 @@
   <main>
     <section class="toolbar panel">
       <div><label for="year">Funding year</label><select id="year"><option value="all">All years</option></select></div>
-      <div><label for="investor">Investor search</label><input id="investor" list="investor-options" placeholder="All investors — type a name" /><datalist id="investor-options"></datalist></div>
+      <div><label for="investor">Investors by associated funding</label><input id="investor-search" aria-label="Search investor names" placeholder="Search investors…" /><select id="investor" aria-label="Select investor, highest associated funding first" style="margin-top:8px"><option value="">All investors</option></select></div>
       <div><label for="startup">Startup search</label><input id="startup" placeholder="All startups — type a name" /></div>
     </section>
-    <p class="note">Coverage: historical records from 2015–2020 and a curated selection of source-linked rounds from 2024–2026. The dataset does not cover 2021–2023; missing years do not mean zero funding. Recent USD conversions to INR crore are approximate.</p>
+    <p class="note">Coverage: historical records from 2015–2020 and a curated selection of source-linked rounds from 2024–2026. The dataset does not cover 2021–2023; missing years do not mean zero funding. Recent USD conversions to INR crore are approximate. Investor ordering uses the full value of rounds they participated in; individual contributions are not available and a round with multiple investors counts for each.</p>
     <section class="kpis">
       <div class="kpi"><span>Total funding</span><strong id="total">—</strong></div>
       <div class="kpi"><span>Largest deal</span><strong id="largest">—</strong></div>
@@ -63,21 +63,43 @@
     const money=n=>`${new Intl.NumberFormat('en-IN',{maximumFractionDigits:1}).format(n)} Cr`;
     const base={paper_bgcolor:'transparent',plot_bgcolor:'transparent',font:{color:'#e8ebf1'},margin:{l:42,r:18,t:18,b:50}};
     let data=[];
+    let rankedInvestors=[];
     const chartReady={};
     Papa.parse('startup_cleaned.csv',{download:true,header:true,dynamicTyping:true,skipEmptyLines:true,complete:({data:rows})=>{
       data=rows.map(r=>({...r,dateObj:new Date(r.date),amount:Number(r.amount)||0})).filter(r=>r.startup&&r.dateObj.toString()!=='Invalid Date');
       [...new Set(data.map(r=>r.dateObj.getFullYear()))].sort((a,b)=>b-a).forEach(y=>document.querySelector('#year').add(new Option(y,y)));
-      const investors=[...new Set(data.flatMap(r=>String(r.investors||'').split(',')).map(x=>x.trim()).filter(Boolean))].sort();
-      investors.forEach(x=>document.querySelector('#investor-options').append(new Option(x,x)));
-      render();
+      const totals=new Map();
+      data.forEach(r=>{
+        const names=new Map();
+        String(r.investors||'').split(',').map(x=>x.trim()).filter(Boolean).forEach(name=>names.set(name.toLocaleLowerCase('en'),name));
+        names.forEach((name,key)=>{
+          const prior=totals.get(key)||{name,amount:0};
+          prior.amount+=r.amount;
+          totals.set(key,prior);
+        });
+      });
+      rankedInvestors=[...totals.entries()].map(([key,record])=>({key,...record})).sort((a,b)=>b.amount-a.amount||a.name.localeCompare(b.name));
+      updateInvestorOptions();
     },error:()=>document.querySelector('main').innerHTML='<div class="panel">The funding dataset could not be loaded.</div>'});
     function group(rows,key){return rows.reduce((a,r)=>{const k=key(r);a[k]=(a[k]||0)+r.amount;return a;},{});}
+    function updateInvestorOptions(){
+      const select=document.querySelector('#investor');
+      const previous=select.value;
+      const query=document.querySelector('#investor-search').value.trim().toLocaleLowerCase('en');
+      const options=document.createDocumentFragment();
+      options.append(new Option('All investors',''));
+      rankedInvestors.filter(r=>r.key.includes(query)).forEach(r=>options.append(new Option(`${r.name} — ${money(r.amount)}`,r.key)));
+      select.replaceChildren(options);
+      select.value=previous;
+      if(select.selectedIndex<0)select.value='';
+      render();
+    }
     function current(){
       const y=document.querySelector('#year').value;
-      const i=document.querySelector('#investor').value.trim().toLowerCase();
+      const i=document.querySelector('#investor').value;
       const s=document.querySelector('#startup').value.trim().toLowerCase();
       return data.filter(r=>(y==='all'||r.dateObj.getFullYear()==y)
-        &&(!i||String(r.investors||'').split(',').some(name=>name.trim().toLowerCase().includes(i)))
+        &&(!i||String(r.investors||'').split(',').some(name=>name.trim().toLocaleLowerCase('en')===i))
         &&(!s||String(r.startup).toLowerCase().includes(s)));
     }
     function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -104,7 +126,8 @@
       document.querySelector('#rows').innerHTML=[...rows].sort((a,b)=>b.dateObj-a.dateObj).slice(0,50).map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.startup)}</td><td>${escapeHtml(r.city||'—')}</td><td>${escapeHtml(r.round||'—')}</td><td>${money(r.amount)}</td><td>${sourceLink(r.source_url)}</td></tr>`).join('')||'<tr><td colspan="6">No investments match.</td></tr>';
     }
     document.querySelector('#year').addEventListener('change',render);
-    document.querySelector('#investor').addEventListener('input',render);
+    document.querySelector('#investor').addEventListener('change',render);
+    document.querySelector('#investor-search').addEventListener('input',updateInvestorOptions);
     document.querySelector('#startup').addEventListener('input',render);
   </script>
 </body>
